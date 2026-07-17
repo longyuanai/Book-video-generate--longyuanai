@@ -183,5 +183,8 @@ cython_debug/
 /test/
 /backend/test
 /backend/AppData/
+
+# 八字模式生成的视频/音频产物
+appdata/bazi_*/
 designer.md
 CLAUDE.md

@@ -4,7 +4,58 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![FFmpeg](https://img.shields.io/badge/FFmpeg-required-red.svg)](https://ffmpeg.org/)
 
-一个自动化书籍推广视频生成工具，可以根据书名自动生成带有配音和字幕的短视频。
+一个自动化短视频生成工具，包含两种模式：
+
+- **📚 书籍推广模式**：根据书名自动生成带配音和字幕的书籍推广短视频；
+- **🔮 出海八字模式**：输入出生日期，自动排四柱、生成英文解读文案、英文配音，输出 9:16 竖屏成片，可直接发布到 TikTok / YouTube Shorts / Instagram Reels。
+
+## 🔮 出海八字模式（BaZi Overseas Mode）
+
+面向海外受众的八字（Four Pillars of Destiny）内容自动化流水线：
+
+```
+出生日期时间 → 排四柱（纯 Python，无需外部 API）
+            → 英文口播文案（LLM 生成，失败自动降级为内置英文模板）
+            → 英文 TTS 配音 + SRT 字幕（Edge-TTS，16 种英文语音）
+            → 9:16 竖屏视频渲染（支持无显示器服务器）
+            → FFmpeg 合成成片
+```
+
+### 使用方法
+
+```bash
+# 交互式输入出生日期
+python main_bazi.py
+
+# 命令行参数
+python main_bazi.py --date 1995-08-17 --time 14:30
+
+# 不调用 LLM（完全离线文案，适合批量跑）
+python main_bazi.py --date 1995-08-17 --offline
+
+# 只生成文案不渲染视频 / 指定语音 / 原尺寸 1080x1920 渲染
+python main_bazi.py --date 1995-08-17 --script-only
+python main_bazi.py --date 1995-08-17 --voice Andrew
+python main_bazi.py --date 1995-08-17 --zoom 100
+```
+
+### 视频内容
+
+- **四柱命盘展示**：年/月/日/时四柱汉字，按五行配色（木绿、火红、土黄、金白、水蓝），带拼音和英文注解
+- **日主（Day Master）解读**：十天干对应的英文性格解读
+- **五行分布与所缺五行**：自动生成「你缺什么、今年该做什么」的内容钩子
+- **英文字幕自动换行**：适配英文长句，带阴影描边保证可读性
+- **片尾 CTA**：引导关注 + 评论区留生日，天然的互动增长钩子
+
+### 排盘说明
+
+- 年柱/月柱以节气（立春等）为界，使用近似节气日期（±1 天），交接日附近可能偏差一柱，做短视频内容足够
+- 日柱以 1949-10-01 甲子日为锚点，60 甲子循环推算；默认晚子时（23 点后）按次日排日柱
+- 模块在 `bazi/` 目录，可独立使用：`from bazi import calculate_bazi`
+
+---
+
+## 📚 书籍推广模式
 
 ## 🖼️ 效果预览
 
@@ -169,11 +220,16 @@ voice = voice_dict.get("晓秋-女")
 
 ```
 Book-video-generate/
-├── main.py              # 主入口文件
-├── app.py               # 视频生成核心
+├── main.py              # 书籍模式入口
+├── main_bazi.py         # 出海八字模式入口
+├── app.py               # 视频生成核心（书籍横屏）
+├── bazi_video.py        # 八字竖屏视频渲染器（9:16，支持无显示器）
+├── bazi/                # 八字模块
+│   ├── calculator.py    # 四柱排盘计算（纯Python）
+│   └── script_writer.py # 英文文案生成（LLM+离线模板）
 ├── spider.py            # 豆瓣爬虫
 ├── llm.py               # LLM客户端
-├── tts_generator.py     # TTS生成器
+├── tts_generator.py     # TTS生成器（含16种英文语音）
 ├── video_processor.py   # 视频处理工具
 ├── requirements.txt     # 依赖列表
 ├── appdata/            # 生成的文件

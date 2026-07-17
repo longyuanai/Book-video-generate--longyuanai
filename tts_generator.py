@@ -51,6 +51,26 @@ voice_dict = {
     "云哲（台湾）-男": "zh-TW-YunJheNeural"
 }
 
+# 出海英文语音（Edge-TTS），适用于 TikTok / YouTube Shorts / Reels 口播
+en_voice_dict = {
+    "Ava（美国）-女": "en-US-AvaMultilingualNeural",
+    "Emma（美国）-女": "en-US-EmmaMultilingualNeural",
+    "Jenny（美国）-女": "en-US-JennyNeural",
+    "Aria（美国）-女": "en-US-AriaNeural",
+    "Michelle（美国）-女": "en-US-MichelleNeural",
+    "Andrew（美国）-男": "en-US-AndrewMultilingualNeural",
+    "Brian（美国）-男": "en-US-BrianMultilingualNeural",
+    "Guy（美国）-男": "en-US-GuyNeural",
+    "Christopher（美国）-男": "en-US-ChristopherNeural",
+    "Sonia（英国）-女": "en-GB-SoniaNeural",
+    "Libby（英国）-女": "en-GB-LibbyNeural",
+    "Ryan（英国）-男": "en-GB-RyanNeural",
+    "Natasha（澳洲）-女": "en-AU-NatashaNeural",
+    "William（澳洲）-男": "en-AU-WilliamNeural",
+    "Clara（加拿大）-女": "en-CA-ClaraNeural",
+    "Neerja（印度）-女": "en-IN-NeerjaNeural",
+}
+
 voice_text = {
     "晓通（吴语）-女": "好久没有拍视频了，今天拍个视频",
     "云哲（吴语）-男": "先生们，女士们。大家好，阿拉现在来学习上海话",

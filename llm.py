@@ -50,22 +50,24 @@ class LLMClient:
         self.api_key = api_key
         self.session = None
     
-    def chat(self, 
-             message: str, 
-             model: str = "glm-4.5", 
+    def chat(self,
+             message: str,
+             model: str = "glm-4.5",
              stream: bool = False,
              temperature: float = 0.7,
-             max_tokens: Optional[int] = None) -> Dict[str, Any]:
+             max_tokens: Optional[int] = None,
+             system_prompt: Optional[str] = None) -> Dict[str, Any]:
         """
         同步聊天接口
-        
+
         Args:
             message: 用户消息
             model: 模型名称
             stream: 是否流式输出
             temperature: 温度参数
             max_tokens: 最大token数
-            
+            system_prompt: 自定义系统提示词（默认为书籍文案提示词）
+
         Returns:
             API响应结果
         """
@@ -74,7 +76,7 @@ class LLMClient:
             "messages": [
                 {
                     "role": "system",
-                    "content": prompt
+                    "content": system_prompt if system_prompt is not None else prompt
                 },
                 {
                     "role": "user",
