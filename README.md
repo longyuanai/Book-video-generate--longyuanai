@@ -14,44 +14,86 @@
 面向海外受众的八字（Four Pillars of Destiny）内容自动化流水线：
 
 ```
-出生日期时间 → 排四柱（纯 Python，无需外部 API）
-            → 英文口播文案（LLM 生成，失败自动降级为内置英文模板）
-            → 英文 TTS 配音 + SRT 字幕（Edge-TTS，16 种英文语音）
-            → 9:16 竖屏视频渲染（支持无显示器服务器）
-            → FFmpeg 合成成片
+出生日期时间 → 排四柱（天文级节气 + 时区 + 十神 + 大运，纯 Python 离线）
+            → 多语言口播文案（英/西/葡；LLM 优先，失败自动降级母语模板）
+            → TTS 配音 + SRT 字幕 + 词级时间戳（Edge-TTS，27 种海外语音）
+            → 9:16 竖屏渲染（逐词高亮字幕、片头动画，支持无显示器服务器）
+            → FFmpeg 合成成片 + 缩略图 + 标题/简介/话题标签
 ```
 
 ### 使用方法
 
 ```bash
-# 交互式输入出生日期
-python main_bazi.py
+# 单条个人命盘
+python main_bazi.py --date 1995-08-17 --time 14:30 --gender female
 
-# 命令行参数
-python main_bazi.py --date 1995-08-17 --time 14:30
+# 海外出生：指定出生地时区（纽约冬令时 -5、伦敦 0、圣保罗 -3）
+python main_bazi.py --date 1995-08-17 --tz -5
 
-# 不调用 LLM（完全离线文案，适合批量跑）
+# 多语言市场：西班牙语（拉美）/ 葡萄牙语（巴西）
+python main_bazi.py --date 1995-08-17 --lang es
+python main_bazi.py --date 1995-08-17 --lang pt
+
+# 批量模式：CSV 一行一条（评论区收集的生日直接喂进来）
+python main_bazi.py --batch birthdays.csv
+
+# 生肖系列：一次生成 12 生肖当日运势（日更内容）
+python main_bazi.py --series zodiac --lang en
+
+# 其他：离线文案 / 只出文案 / 指定语音 / 原尺寸渲染
 python main_bazi.py --date 1995-08-17 --offline
-
-# 只生成文案不渲染视频 / 指定语音 / 原尺寸 1080x1920 渲染
 python main_bazi.py --date 1995-08-17 --script-only
 python main_bazi.py --date 1995-08-17 --voice Andrew
 python main_bazi.py --date 1995-08-17 --zoom 100
 ```
 
-### 视频内容
+批量 CSV 格式（date 必填，其余可省）：
 
-- **四柱命盘展示**：年/月/日/时四柱汉字，按五行配色（木绿、火红、土黄、金白、水蓝），带拼音和英文注解
-- **日主（Day Master）解读**：十天干对应的英文性格解读
-- **五行分布与所缺五行**：自动生成「你缺什么、今年该做什么」的内容钩子
-- **英文字幕自动换行**：适配英文长句，带阴影描边保证可读性
-- **片尾 CTA**：引导关注 + 评论区留生日，天然的互动增长钩子
+```csv
+date,time,tz,gender,lang,voice
+1995-08-17,14:30,8,female,en,Ava
+2001-03-02,,-5,male,es,
+```
 
-### 排盘说明
+### 每条视频的输出物料
 
-- 年柱/月柱以节气（立春等）为界，使用近似节气日期（±1 天），交接日附近可能偏差一柱，做短视频内容足够
-- 日柱以 1949-10-01 甲子日为锚点，60 甲子循环推算；默认晚子时（23 点后）按次日排日柱
-- 模块在 `bazi/` 目录，可独立使用：`from bazi import calculate_bazi`
+```
+appdata/bazi_19950817_1430_en/
+├── final_video.mp4    # 9:16 成片（可直发 TikTok/Shorts/Reels）
+├── thumbnail.png      # 封面缩略图
+├── script.txt         # 口播文案
+├── publish.txt/json   # 标题 + 简介 + 话题标签
+├── narration.mp3/.srt # 配音与字幕
+└── narration.words.json  # 词级时间戳（逐词高亮字幕用）
+```
+
+### 视频与内容特性
+
+- **四柱命盘展示**：四柱汉字按五行配色（木绿、火红、土黄、金白、水蓝），拼音+英文注解，片头逐列入场动画
+- **逐词高亮字幕（卡拉OK式）**：基于 TTS 词级时间戳，已读白/当前金/未读灰，无词级数据自动降级整句字幕
+- **命理深度**：日主性格、五行分布与所缺、十神、大运（当前十年运融入文案）
+- **玄学风格素材**：`tools/generate_assets.py` 程序化生成星云/星空/金粉竖屏背景与 ambient 冥想 BGM，全部离线无版权风险
+- **片尾 CTA**：引导关注 + 评论区留生日，天然互动增长钩子
+
+### 排盘精度
+
+- 节气采用天文算法（Meeus 太阳视黄经，误差约 ±15 分钟），年柱/月柱交接日附近也能排准
+- 支持出生地时区（`--tz`），海外出生排盘必备
+- 日柱以 1949-10-01 甲子日为锚点；默认晚子时（23 点后）按次日排日柱
+- 大运：阳年男/阴年女顺排，起运年龄按 3 天折 1 年精确计算
+- 模块可独立使用：`from bazi import calculate_bazi`
+
+### LLM 配置（可选）
+
+默认使用内置免费接口；建议配置环境变量切换到稳定的 OpenAI 兼容接口：
+
+```bash
+export LLM_API_URL="https://api.openai.com/v1/chat/completions"
+export LLM_API_KEY="sk-..."
+export LLM_MODEL="gpt-4o-mini"
+```
+
+不配置或调用失败时自动降级为内置母语模板（英/西/葡），离线也能出片。
 
 ---
 
@@ -223,13 +265,18 @@ Book-video-generate/
 ├── main.py              # 书籍模式入口
 ├── main_bazi.py         # 出海八字模式入口
 ├── app.py               # 视频生成核心（书籍横屏）
-├── bazi_video.py        # 八字竖屏视频渲染器（9:16，支持无显示器）
+├── bazi_video.py        # 八字竖屏渲染器（9:16、逐词字幕、片头动画、无显示器）
 ├── bazi/                # 八字模块
-│   ├── calculator.py    # 四柱排盘计算（纯Python）
-│   └── script_writer.py # 英文文案生成（LLM+离线模板）
+│   ├── calculator.py    # 四柱排盘（十神、大运、时区，纯Python）
+│   ├── solar_terms.py   # 天文级节气计算（Meeus 算法）
+│   ├── script_writer.py # 多语言文案生成（LLM+母语模板，英/西/葡）
+│   ├── locales.py       # 多语言资源
+│   └── publish_kit.py   # 发布素材（标题/简介/话题标签）
+├── tools/
+│   └── generate_assets.py # 程序化生成玄学风格背景与BGM
 ├── spider.py            # 豆瓣爬虫
-├── llm.py               # LLM客户端
-├── tts_generator.py     # TTS生成器（含16种英文语音）
+├── llm.py               # LLM客户端（环境变量配置，OpenAI兼容）
+├── tts_generator.py     # TTS生成器（27种海外语音+词级时间戳）
 ├── video_processor.py   # 视频处理工具
 ├── requirements.txt     # 依赖列表
 ├── appdata/            # 生成的文件
