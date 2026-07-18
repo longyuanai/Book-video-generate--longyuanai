@@ -1,8 +1,29 @@
+import os
 import requests
 import json
+from pathlib import Path
 from typing import Optional, Dict, List, Any
 import asyncio
 import aiohttp
+
+
+def _load_dotenv(path: Optional[Path] = None) -> None:
+    """
+    轻量 .env 加载（无第三方依赖）：项目根目录 .env，每行 KEY=VALUE。
+    已存在的环境变量不会被覆盖（系统环境变量优先）。
+    """
+    path = path or Path(__file__).parent / ".env"
+    if not path.exists():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+_load_dotenv()
 
 prompt = """请你扮演一位图书文案专家，为指定的书籍创作一段具有诗意的短视频分享文案。
 ## 核心要求：
@@ -50,7 +71,6 @@ class LLMClient:
 
     def __init__(self, api_url: Optional[str] = None, api_key: Optional[str] = None,
                  model: Optional[str] = None):
-        import os
         self.api_url = api_url or os.environ.get("LLM_API_URL", DEFAULT_API_URL)
         self.api_key = api_key or os.environ.get("LLM_API_KEY")
         self.model = model or os.environ.get("LLM_MODEL", "glm-4.5")

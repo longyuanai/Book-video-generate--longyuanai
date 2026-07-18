@@ -85,15 +85,18 @@ appdata/bazi_19950817_1430_en/
 
 ### LLM 配置（可选）
 
-默认使用内置免费接口；建议配置环境变量切换到稳定的 OpenAI 兼容接口：
+默认使用内置免费接口；建议切换到稳定的 OpenAI 兼容接口（DeepSeek / OpenAI / 智谱 GLM 等）。
+推荐方式：复制 `.env.example` 为 `.env` 并填入配置（`.env` 不会被提交）：
 
 ```bash
-export LLM_API_URL="https://api.openai.com/v1/chat/completions"
-export LLM_API_KEY="sk-..."
-export LLM_MODEL="gpt-4o-mini"
+cp .env.example .env
+# 编辑 .env：
+# LLM_API_URL=https://api.deepseek.com/v1/chat/completions
+# LLM_API_KEY=sk-...
+# LLM_MODEL=deepseek-chat
 ```
 
-不配置或调用失败时自动降级为内置母语模板（英/西/葡），离线也能出片。
+也可以用系统环境变量（优先级高于 .env）。不配置或调用失败时自动降级为内置母语模板（英/西/葡），离线也能出片。
 
 ---
 
