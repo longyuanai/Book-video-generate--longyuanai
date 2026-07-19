@@ -37,8 +37,17 @@ python main_bazi.py --date 1995-08-17 --lang pt
 # 批量模式：CSV 一行一条（评论区收集的生日直接喂进来）
 python main_bazi.py --batch birthdays.csv
 
-# 生肖系列：一次生成 12 生肖当日运势（日更内容）
-python main_bazi.py --series zodiac --lang en
+# 合婚配对：两个生日 -> 契合度评分 + 解读视频（互动性最强）
+python main_bazi.py --compat 1995-08-17,14:30 1997-02-11
+
+# 生肖系列：一次生成 12 生肖当日运势（日更内容，--jobs 并行提速）
+python main_bazi.py --series zodiac --lang en --jobs 4
+
+# 真太阳时校正（出生地经度，传统排盘严谨做法）
+python main_bazi.py --date 1995-08-17 --longitude -74.0 --tz -5
+
+# A/B 钩子测试：同一命盘出 3 版不同开头的文案（需 LLM）
+python main_bazi.py --date 1995-08-17 --variants 3
 
 # 其他：离线文案 / 只出文案 / 指定语音 / 原尺寸渲染
 python main_bazi.py --date 1995-08-17 --offline
@@ -70,18 +79,30 @@ appdata/bazi_19950817_1430_en/
 ### 视频与内容特性
 
 - **四柱命盘展示**：四柱汉字按五行配色（木绿、火红、土黄、金白、水蓝），拼音+英文注解，片头逐列入场动画
+- **动态背景**：Ken Burns 缓慢平移 + 交叉淡入切换 + 漂浮星光粒子（呼吸式闪烁）
 - **逐词高亮字幕（卡拉OK式）**：基于 TTS 词级时间戳，已读白/当前金/未读灰，无词级数据自动降级整句字幕
-- **命理深度**：日主性格、五行分布与所缺、十神、大运（当前十年运融入文案）
+- **命理深度**：日主性格、五行分布与所缺、十神、地支藏干、神煞（桃花/驿马/华盖/天乙贵人）、大运（当前十年运融入文案）
+- **合婚配对**：年支六合/三合/六冲、夫妻宫、日主生克、五行互补 -> 契合度评分 + 解读
 - **玄学风格素材**：`tools/generate_assets.py` 程序化生成星云/星空/金粉竖屏背景与 ambient 冥想 BGM，全部离线无版权风险
 - **片尾 CTA**：引导关注 + 评论区留生日，天然互动增长钩子
 
 ### 排盘精度
 
 - 节气采用天文算法（Meeus 太阳视黄经，误差约 ±15 分钟），年柱/月柱交接日附近也能排准
-- 支持出生地时区（`--tz`），海外出生排盘必备
+- 支持出生地时区（`--tz`）与真太阳时校正（`--longitude`，含经度差与均时差），海外出生排盘必备
 - 日柱以 1949-10-01 甲子日为锚点；默认晚子时（23 点后）按次日排日柱
 - 大运：阳年男/阴年女顺排，起运年龄按 3 天折 1 年精确计算
 - 模块可独立使用：`from bazi import calculate_bazi`
+
+### 开发与部署
+
+```bash
+pytest tests/           # 单元测试（19 例，覆盖排盘/文案/合婚/发布素材）
+docker build -t bazi-video .
+docker run --rm -v $(pwd)/appdata:/app/appdata bazi-video --series zodiac --jobs 4
+```
+
+仓库配有 GitHub Actions CI，push/PR 自动跑测试。
 
 ### LLM 配置（可选）
 

@@ -50,6 +50,23 @@ def build_zodiac_publish_kit(animal: str, day: date_type, lang: str = "en") -> D
     }
 
 
+def build_compat_publish_kit(result, lang: str = "en") -> Dict[str, object]:
+    """合婚配对视频的发布素材（result 为 CompatResult）"""
+    check_lang(lang)
+    p = PUBLISH[lang]
+    da = format_date(result.chart_a.birth_time, lang)
+    db = format_date(result.chart_b.birth_time, lang)
+    return {
+        "type": "compat",
+        "lang": lang,
+        "title": p["title_compat"].format(da=da, db=db),
+        "description": p["description_compat"].format(da=da, db=db, score=result.score),
+        "hashtags": p["hashtags"] + (["#compatibility", "#couplegoals"] if lang == "en" else
+                                     ["#compatibilidad"] if lang == "es" else
+                                     ["#compatibilidade"]),
+    }
+
+
 def save_publish_kit(kit: Dict[str, object], out_dir: Path) -> Path:
     """保存 publish.json + publish.txt，返回 txt 路径"""
     out_dir.mkdir(parents=True, exist_ok=True)

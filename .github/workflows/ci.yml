@@ -1,0 +1,20 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install test dependencies
+        # 测试只覆盖 bazi 排盘/文案/发布模块，不需要 pygame/opencv/edge-tts
+        run: pip install pytest requests aiohttp
+      - name: Run tests
+        run: pytest tests/ -v

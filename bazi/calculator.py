@@ -33,6 +33,21 @@ BRANCH_ELEMENT = ["Water", "Earth", "Wood", "Wood", "Earth", "Fire", "Fire", "Ea
 BRANCH_ANIMAL = ["Rat", "Ox", "Tiger", "Rabbit", "Dragon", "Snake", "Horse", "Goat", "Monkey", "Rooster", "Dog", "Pig"]
 # 地支本气天干（用于地支十神）
 BRANCH_MAIN_STEM = [9, 5, 0, 1, 4, 2, 3, 5, 6, 7, 4, 8]
+# 地支藏干全表（本气在前）
+BRANCH_HIDDEN_STEMS = [
+    [9],        # 子: 癸
+    [5, 9, 7],  # 丑: 己癸辛
+    [0, 2, 4],  # 寅: 甲丙戊
+    [1],        # 卯: 乙
+    [4, 1, 9],  # 辰: 戊乙癸
+    [2, 6, 4],  # 巳: 丙庚戊
+    [3, 5],     # 午: 丁己
+    [5, 3, 1],  # 未: 己丁乙
+    [6, 8, 4],  # 申: 庚壬戊
+    [7],        # 酉: 辛
+    [4, 7, 3],  # 戌: 戊辛丁
+    [8, 0],     # 亥: 壬甲
+]
 
 ELEMENT_EMOJI = {"Wood": "🌳", "Fire": "🔥", "Earth": "⛰️", "Metal": "⚔️", "Water": "🌊"}
 ELEMENT_CN = {"Wood": "木", "Fire": "火", "Earth": "土", "Metal": "金", "Water": "水"}
@@ -54,6 +69,46 @@ TEN_GOD_NAMES = {
 
 # 日柱锚点：1949-10-01 为甲子日
 _DAY_ANCHOR = date(1949, 10, 1)
+
+# 神煞（中文, 英文, 一句话英文含义）
+SHENSHA_INFO = {
+    "peach_blossom": ("桃花", "Peach Blossom", "romance and personal charm"),
+    "travel_horse": ("驿马", "Travel Horse", "movement, travel and change"),
+    "canopy": ("华盖", "Canopy Star", "solitude, wisdom and artistry"),
+    "nobleman": ("天乙贵人", "Nobleman Star", "helpful people appearing in hard times"),
+}
+
+# 三合局组 -> (桃花, 驿马, 华盖) 对应地支下标
+# 申子辰->酉寅辰  寅午戌->卯申戌  巳酉丑->午亥丑  亥卯未->子巳未
+_TRINE_STARS = {
+    frozenset([8, 0, 4]): (9, 2, 4),
+    frozenset([2, 6, 10]): (3, 8, 10),
+    frozenset([5, 9, 1]): (6, 11, 1),
+    frozenset([11, 3, 7]): (0, 5, 7),
+}
+
+# 天乙贵人：日干 -> 贵人地支（甲戊庚牛羊，乙己鼠猴乡，丙丁猪鸡位，壬癸兔蛇藏，六辛逢马虎）
+_NOBLEMAN = {
+    0: [1, 7], 4: [1, 7], 6: [1, 7],   # 甲戊庚 -> 丑未
+    1: [0, 8], 5: [0, 8],              # 乙己 -> 子申
+    2: [11, 9], 3: [11, 9],            # 丙丁 -> 亥酉
+    8: [3, 5], 9: [3, 5],              # 壬癸 -> 卯巳
+    7: [6, 2],                          # 辛 -> 午寅
+}
+
+
+def _trine_group(branch: int) -> frozenset:
+    for group in _TRINE_STARS:
+        if branch in group:
+            return group
+    raise ValueError(branch)
+
+
+def _equation_of_time_minutes(d: date) -> float:
+    """均时差（分钟）近似公式，误差约 ±0.5 分钟"""
+    import math
+    b = 2 * math.pi * (d.timetuple().tm_yday - 81) / 364
+    return 9.87 * math.sin(2 * b) - 7.53 * math.cos(b) - 1.5 * math.sin(b)
 
 
 def ten_god_of(day_stem: int, other_stem: int) -> Tuple[str, str]:
@@ -174,6 +229,28 @@ class BaziChart:
     def missing_elements(self) -> List[str]:
         return [e for e, c in self.element_counts().items() if c == 0]
 
+    def hidden_stems(self) -> Dict[str, List[str]]:
+        """各柱地支藏干：{"Year": ["壬", "甲"], ...}"""
+        return {name: [STEMS[s] for s in BRANCH_HIDDEN_STEMS[p.branch_index]]
+                for name, p in self.pillars.items()}
+
+    def shensha(self) -> List[Tuple[str, str, str]]:
+        """
+        神煞（娱乐向精选 4 颗）：返回 [(中文, 英文, 英文含义), ...]。
+        桃花/驿马/华盖 以年支与日支三合局查全盘地支；天乙贵人以日干查全盘地支。
+        """
+        branches = [p.branch_index for p in self.pillars.values()]
+        found = {}
+        for ref in (self.year.branch_index, self.day.branch_index):
+            peach, horse, canopy = _TRINE_STARS[_trine_group(ref)]
+            for key, star in (("peach_blossom", peach), ("travel_horse", horse),
+                              ("canopy", canopy)):
+                if star in branches:
+                    found[key] = SHENSHA_INFO[key]
+        if any(b in _NOBLEMAN[self.day.stem_index] for b in branches):
+            found["nobleman"] = SHENSHA_INFO["nobleman"]
+        return list(found.values())
+
     def ten_gods(self) -> Dict[str, Dict[str, Tuple[str, str]]]:
         """
         各柱十神：{"Year": {"stem": (中,英), "branch": (中,英)}, ...}
@@ -210,6 +287,9 @@ class BaziChart:
         if self.luck_pillars:
             lp = "  ".join(f"{l.pillar.hanzi}({l.age_range()})" for l in self.luck_pillars[:6])
             lines.append(f"  Luck Pillars 大运: {lp}")
+        stars = self.shensha()
+        if stars:
+            lines.append(f"  Stars 神煞: {'  '.join(f'{cn}({en})' for cn, en, _ in stars)}")
         lines.append("=" * 56)
         return "\n".join(lines)
 
@@ -243,7 +323,8 @@ def _calc_luck_pillars(chart: BaziChart, birth_utc: datetime,
 
 def calculate_bazi(birth: datetime, tz_hours: float = 8.0,
                    gender: Optional[str] = None,
-                   late_zi_next_day: bool = True) -> BaziChart:
+                   late_zi_next_day: bool = True,
+                   longitude: Optional[float] = None) -> BaziChart:
     """
     根据公历出生时间排四柱。
 
@@ -253,7 +334,16 @@ def calculate_bazi(birth: datetime, tz_hours: float = 8.0,
                   纽约冬令时 -5、洛杉矶冬令时 -8、伦敦 0 等）
         gender: "male"/"female"，提供后计算大运
         late_zi_next_day: 晚子时（23:00 后）是否按次日排日柱（默认主流排法：是）
+        longitude: 出生地经度（东经为正，如北京 116.4、纽约 -74.0）。
+                   提供后按真太阳时校正日柱/时柱（钟表时 -> 当地真太阳时，
+                   含经度差与均时差），传统排盘的严谨做法。
     """
+    # 真太阳时校正（仅影响日柱/时柱的当地时刻；节气比较用绝对 UTC 不受影响）
+    local_birth = birth
+    if longitude is not None:
+        offset_min = (longitude - tz_hours * 15) * 4 + _equation_of_time_minutes(birth.date())
+        local_birth = birth + timedelta(minutes=offset_min)
+
     chart = BaziChart(birth_time=birth, tz_hours=tz_hours, gender=gender)
     birth_utc = birth - timedelta(hours=tz_hours)
 
@@ -267,15 +357,15 @@ def calculate_bazi(birth: datetime, tz_hours: float = 8.0,
     month_stem = (chart.year.stem_index % 5 * 2 + 2 + month_order) % 10
     chart.month = Pillar(month_stem, month_branch)
 
-    # ---- 日柱：甲子日锚点 + 晚子时换日（按出生地当地时间）----
-    day_for_pillar = birth.date()
-    if late_zi_next_day and birth.hour == 23:
+    # ---- 日柱：甲子日锚点 + 晚子时换日（按出生地当地/真太阳时间）----
+    day_for_pillar = local_birth.date()
+    if late_zi_next_day and local_birth.hour == 23:
         day_for_pillar += timedelta(days=1)
     day_index = (day_for_pillar - _DAY_ANCHOR).days % 60
     chart.day = Pillar(day_index % 10, day_index % 12)
 
     # ---- 时柱：五鼠遁时 ----
-    hour_branch = ((birth.hour + 1) // 2) % 12
+    hour_branch = ((local_birth.hour + 1) // 2) % 12
     hour_stem = (chart.day.stem_index * 2 + hour_branch) % 10
     chart.hour = Pillar(hour_stem, hour_branch)
 
@@ -318,5 +408,17 @@ if __name__ == "__main__":
     # 自检 5：时区（纽约 2000-01-01 00:30 UTC-5 = 北京 13:30，同为己卯年）
     ny = calculate_bazi(datetime(2000, 1, 1, 0, 30), tz_hours=-5)
     assert ny.year.hanzi == "己卯"
+
+    # 自检 6：藏干与神煞（1995-08-17 庚辰日，四支 亥申辰未）
+    hidden = c.hidden_stems()
+    assert hidden["Year"] == ["壬", "甲"], hidden["Year"]      # 亥藏壬甲
+    assert hidden["Day"] == ["戊", "乙", "癸"], hidden["Day"]  # 辰藏戊乙癸
+    star_names = [en for _, en, _ in c.shensha()]
+    assert "Nobleman Star" in star_names, star_names   # 庚日干见未
+    assert "Canopy Star" in star_names, star_names     # 申子辰组见辰
+
+    # 自检 7：真太阳时（乌鲁木齐经度 87.6 用北京时间，钟表 15:30 真太阳时约 13:20 -> 未时）
+    urumqi = calculate_bazi(datetime(1995, 8, 17, 15, 30), longitude=87.6)
+    assert BRANCHES[urumqi.hour.branch_index] == "未", urumqi.hour.hanzi
 
     print("calculator self-check passed ✓")

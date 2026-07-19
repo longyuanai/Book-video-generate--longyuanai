@@ -33,7 +33,9 @@ import cv2
 import numpy as np
 import pygame
 
-from app import Background, Subtitle, get_screen_size
+import math
+
+from app import Subtitle, get_screen_size
 from bazi.calculator import (BRANCH_ELEMENT, BRANCHES, BaziChart, ELEMENT_CN)
 from bazi.locales import ANIMAL_NAMES, ELEMENT_NAMES
 from bazi.script_writer import format_date, zodiac_branch_index
@@ -87,6 +89,105 @@ def _pick_asset_dir(resource_dir: Path, preferred: str, fallback: str) -> Path:
     if p.is_dir() and any(p.iterdir()):
         return p
     return resource_dir / fallback
+
+
+class KenBurnsBackground:
+    """
+    带动效的背景：每张图缓慢平移（Ken Burns 效果），切换时交叉淡入。
+    图片按超出屏幕约 12% 预缩放，逐帧仅做偏移贴图，几乎无额外开销。
+    """
+
+    DRIFT = 0.12       # 超出屏幕的比例（平移空间）
+    FADE_SEC = 0.9     # 交叉淡入时长
+
+    # 平移方向轮换：四组起止点（归一化坐标）
+    _PATHS = [((0, 0), (1, 1)), ((1, 0), (0, 1)), ((0, 1), (1, 0)), ((1, 1), (0, 0))]
+
+    def __init__(self, backgrounds_dir: Path, screen_w: int, screen_h: int,
+                 fps: int = 30, switch_time: float = 10):
+        self.screen_w = screen_w
+        self.screen_h = screen_h
+        self.fps = fps
+        self.period = int(switch_time * fps)
+        self.fade_frames = int(self.FADE_SEC * fps)
+        self.images = []
+        target_w = int(screen_w * (1 + self.DRIFT))
+        target_h = int(screen_h * (1 + self.DRIFT))
+        for path in sorted(Path(backgrounds_dir).glob("*")):
+            try:
+                img = pygame.image.load(str(path)).convert()
+            except pygame.error:
+                continue
+            w, h = img.get_size()
+            scale = max(target_w / w, target_h / h)
+            img = pygame.transform.smoothscale(img, (int(w * scale), int(h * scale)))
+            self.images.append(img)
+        self.num_images = len(self.images)
+
+    def _blit_at(self, screen: pygame.Surface, idx: int, t01: float, alpha: int = 255):
+        img = self.images[idx % self.num_images]
+        margin_x = img.get_width() - self.screen_w
+        margin_y = img.get_height() - self.screen_h
+        (sx, sy), (ex, ey) = self._PATHS[idx % len(self._PATHS)]
+        fx = sx + (ex - sx) * t01
+        fy = sy + (ey - sy) * t01
+        img.set_alpha(alpha)
+        screen.blit(img, (-margin_x * fx, -margin_y * fy))
+
+    def update(self, screen: pygame.Surface, p: int):
+        if self.num_images == 0:
+            return
+        idx = p // self.period
+        t01 = (p % self.period) / self.period
+        in_fade = p % self.period < self.fade_frames and idx > 0
+        if in_fade:
+            # 前一张画到终点位置，当前张淡入叠加
+            self._blit_at(screen, idx - 1, 1.0)
+            fade_t = (p % self.period) / self.fade_frames
+            self._blit_at(screen, idx, t01, alpha=int(255 * fade_t))
+        else:
+            self._blit_at(screen, idx, t01)
+
+
+class Particles:
+    """漂浮的星光粒子：缓慢上浮 + 呼吸式闪烁，预渲染光斑逐帧贴图"""
+
+    def __init__(self, screen_w: int, screen_h: int, fps: int = 30, count: int = 36):
+        self.screen_w = screen_w
+        self.screen_h = screen_h
+        self.fps = fps
+        rnd = random.Random(7)
+        scale = screen_h / 1920
+        # 预渲染 3 档光斑
+        self.sprites = []
+        for radius in (int(6 * scale) + 1, int(10 * scale) + 1, int(16 * scale) + 2):
+            s = pygame.Surface((radius * 4, radius * 4), pygame.SRCALPHA)
+            center = radius * 2
+            for r in range(radius, 0, -1):
+                a = int(90 * (1 - r / radius) ** 2 + 8)
+                pygame.draw.circle(s, (255, 240, 210, a), (center, center), r)
+            self.sprites.append(s)
+        self.items = [{
+            "x": rnd.uniform(0, screen_w),
+            "y": rnd.uniform(0, screen_h),
+            "speed": rnd.uniform(6, 18) * scale,        # px/s 上浮
+            "sway": rnd.uniform(4, 14) * scale,
+            "sway_freq": rnd.uniform(0.1, 0.35),
+            "twinkle_freq": rnd.uniform(0.3, 1.1),
+            "phase": rnd.uniform(0, math.tau),
+            "sprite": rnd.choices((0, 1, 2), weights=(5, 3, 1))[0],
+        } for _ in range(count)]
+
+    def update(self, screen: pygame.Surface, p: int):
+        t = p / self.fps
+        h = self.screen_h
+        for it in self.items:
+            y = (it["y"] - it["speed"] * t) % (h + 40) - 20
+            x = it["x"] + it["sway"] * math.sin(math.tau * it["sway_freq"] * t + it["phase"])
+            alpha = int(140 + 110 * math.sin(math.tau * it["twinkle_freq"] * t + it["phase"]))
+            sprite = self.sprites[it["sprite"]]
+            sprite.set_alpha(max(30, alpha))
+            screen.blit(sprite, (x - sprite.get_width() // 2, y - sprite.get_height() // 2))
 
 
 class WrappedSubtitle(Subtitle):
@@ -369,6 +470,69 @@ class ZodiacBoard:
         screen.blit(self.board, (0, int(self.screen_h * 0.09)))
 
 
+class CompatBoard:
+    """合婚展示板：两位日主 + 生肖 + 中央契合度评分"""
+
+    HEADINGS = {"en": "COMPATIBILITY", "es": "COMPATIBILIDAD", "pt": "COMPATIBILIDADE"}
+
+    def __init__(self, result, lang: str, font_path: Path, screen_w: int, screen_h: int):
+        from bazi.locales import ANIMAL_NAMES as _AN
+        self.screen_w = screen_w
+        self.screen_h = screen_h
+        scale = screen_h / 1920
+        title_font = pygame.font.Font(str(font_path), max(int(56 * scale), 16))
+        hanzi_font = pygame.font.Font(str(font_path), max(int(150 * scale), 30))
+        small_font = pygame.font.Font(str(font_path), max(int(34 * scale), 12))
+        score_font = pygame.font.Font(str(font_path), max(int(170 * scale), 34))
+
+        def person_column(chart) -> pygame.Surface:
+            stem_color = ELEMENT_COLOR[chart.day.stem_element]
+            hanzi = hanzi_font.render(chart.day_master, True, stem_color)
+            animal = small_font.render(_AN[lang][chart.zodiac_animal], True, WHITE)
+            date_s = small_font.render(chart.birth_time.strftime("%Y-%m-%d"), True, DIM)
+            w = max(s.get_width() for s in (hanzi, animal, date_s))
+            gap = int(8 * scale)
+            surf = pygame.Surface(
+                (w, hanzi.get_height() + animal.get_height() + date_s.get_height() + gap * 2),
+                pygame.SRCALPHA)
+            y = 0
+            for s in (hanzi, animal, date_s):
+                surf.blit(s, ((w - s.get_width()) // 2, y))
+                y += s.get_height() + gap
+            return surf
+
+        title = title_font.render(self.HEADINGS.get(lang, self.HEADINGS["en"]), True, GOLD)
+        col_a = person_column(result.chart_a)
+        col_b = person_column(result.chart_b)
+        plus = hanzi_font.render("+", True, DIM)
+        score = score_font.render(str(result.score), True, GOLD)
+        score_suffix = small_font.render("/ 100", True, DIM)
+
+        h = (title.get_height() + int(30 * scale)
+             + max(col_a.get_height(), col_b.get_height()) + int(26 * scale)
+             + score.get_height() + score_suffix.get_height())
+        self.board = pygame.Surface((screen_w, h), pygame.SRCALPHA)
+
+        y = 0
+        self.board.blit(title, ((screen_w - title.get_width()) // 2, y))
+        y += title.get_height() + int(30 * scale)
+        row_h = max(col_a.get_height(), col_b.get_height())
+        quarter = screen_w // 4
+        self.board.blit(col_a, (quarter - col_a.get_width() // 2, y))
+        self.board.blit(plus, ((screen_w - plus.get_width()) // 2,
+                               y + (row_h - plus.get_height()) // 2))
+        self.board.blit(col_b, (3 * quarter - col_b.get_width() // 2, y))
+        y += row_h + int(26 * scale)
+        self.board.blit(score, ((screen_w - score.get_width()) // 2, y))
+        y += score.get_height()
+        self.board.blit(score_suffix, ((screen_w - score_suffix.get_width()) // 2, y))
+
+    def update(self, screen: pygame.Surface, p: int, fps: int = 30):
+        alpha = min(255, int(255 * (p / fps) / 0.8))
+        self.board.set_alpha(alpha)
+        screen.blit(self.board, (0, int(self.screen_h * 0.08)))
+
+
 def _render_movie(board_factory, resource_dir: Path, out_dir: Path, font_path: Path,
                   zoom: int, fps: int) -> Optional[Path]:
     """通用渲染流程：背景 + 展示板 + 字幕 -> video.mp4 + thumbnail.png -> 合成"""
@@ -394,10 +558,11 @@ def _render_movie(board_factory, resource_dir: Path, out_dir: Path, font_path: P
     screen_w, screen_h = get_screen_size("9:16", zoom)
     screen = pygame.display.set_mode((screen_w, screen_h))
 
-    background = Background(
+    background = KenBurnsBackground(
         backgrounds_dir=bg_dir,
         screen_w=screen_w, screen_h=screen_h, fps=fps, switch_time=10,
     )
+    particles = Particles(screen_w, screen_h, fps=fps)
     overlay = pygame.Surface((screen_w, screen_h), pygame.SRCALPHA)
     overlay.fill((10, 8, 20, 150))  # 暗色蒙层，保证文字可读
 
@@ -433,6 +598,7 @@ def _render_movie(board_factory, resource_dir: Path, out_dir: Path, font_path: P
         screen.fill((10, 8, 20))
         background.update(screen, p)
         screen.blit(overlay, (0, 0))
+        particles.update(screen, p)
         board.update(screen, p, fps=fps)
         if subtitle:
             subtitle.update(screen, p)
@@ -483,4 +649,12 @@ def make_zodiac_movie(animal: str, day: date_type, lang: str,
     """渲染生肖每日运势视频（系列内容）"""
     return _render_movie(
         lambda fp, w, h: ZodiacBoard(animal, day, lang, fp, w, h),
+        resource_dir, out_dir, font_path, zoom, fps)
+
+
+def make_compat_movie(result, lang: str, resource_dir: Path, out_dir: Path,
+                      font_path: Path, zoom: int = 150, fps: int = 30) -> Optional[Path]:
+    """渲染合婚配对视频（result 为 bazi.compatibility.CompatResult）"""
+    return _render_movie(
+        lambda fp, w, h: CompatBoard(result, lang, fp, w, h),
         resource_dir, out_dir, font_path, zoom, fps)

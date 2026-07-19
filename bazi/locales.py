@@ -127,6 +127,28 @@ ELEMENT_TIPS = {
     },
 }
 
+# 神煞一句话解读（用于命盘文案，按英文名索引）
+SHENSHA_PHRASES = {
+    "en": {
+        "Peach Blossom": "Your chart also carries the Peach Blossom star — natural charm that people notice before you say a word.",
+        "Travel Horse": "Your chart also carries the Travel Horse star — your best opportunities tend to come from moving, not waiting.",
+        "Canopy Star": "Your chart also carries the Canopy Star — a mark of artists and deep thinkers who need their own quiet world.",
+        "Nobleman Star": "And your chart carries the Nobleman Star — when things go wrong, the right person always seems to show up for you.",
+    },
+    "es": {
+        "Peach Blossom": "Tu carta también lleva la estrella de la Flor de Durazno: un encanto natural que la gente nota antes de que digas una palabra.",
+        "Travel Horse": "Tu carta también lleva la estrella del Caballo Viajero: tus mejores oportunidades llegan al moverte, no al esperar.",
+        "Canopy Star": "Tu carta también lleva la estrella del Dosel: la marca de los artistas y pensadores profundos que necesitan su propio mundo.",
+        "Nobleman Star": "Y tu carta lleva la estrella del Benefactor: cuando algo sale mal, la persona correcta siempre aparece para ayudarte.",
+    },
+    "pt": {
+        "Peach Blossom": "Seu mapa também carrega a estrela da Flor de Pêssego: um charme natural que as pessoas percebem antes de você dizer uma palavra.",
+        "Travel Horse": "Seu mapa também carrega a estrela do Cavalo Viajante: suas melhores oportunidades vêm do movimento, não da espera.",
+        "Canopy Star": "Seu mapa também carrega a estrela do Dossel: a marca de artistas e pensadores profundos que precisam do próprio mundo.",
+        "Nobleman Star": "E seu mapa carrega a estrela do Benfeitor: quando algo dá errado, a pessoa certa sempre aparece para te ajudar.",
+    },
+}
+
 # LLM 提示词中的语言名
 LANGUAGE_NAMES = {"en": "English", "es": "Spanish (Latin American)", "pt": "Brazilian Portuguese"}
 
@@ -142,6 +164,8 @@ PUBLISH = {
                               "and comment your birth date for a free personal reading! 🔮",
         "hashtags": ["#bazi", "#chineseastrology", "#fourpillarsofdestiny", "#zodiac",
                      "#astrology", "#fyp", "#spirituality", "#birthchart"],
+        "title_compat": "Born on {da} + {db}? Your Compatibility, Explained ❤️🔮",
+        "description_compat": "BaZi compatibility reading for {da} and {db}. Score: {score}/100. Send this to your person! Comment both your birth dates for a free couple reading. 🔮",
         "cta_comment": "Comment your birth date for a free reading!",
     },
     "es": {
@@ -154,6 +178,8 @@ PUBLISH = {
                               "y comenta tu fecha de nacimiento para una lectura personal gratis. 🔮",
         "hashtags": ["#bazi", "#astrologiachina", "#cuatropilares", "#zodiaco",
                      "#astrologia", "#fyp", "#espiritualidad", "#cartaastral"],
+        "title_compat": "¿Nacieron el {da} y el {db}? Su compatibilidad, explicada ❤️🔮",
+        "description_compat": "Lectura de compatibilidad BaZi para {da} y {db}. Puntaje: {score}/100. ¡Envíaselo a tu persona! Comenten sus dos fechas de nacimiento para una lectura gratis. 🔮",
         "cta_comment": "¡Comenta tu fecha de nacimiento para una lectura gratis!",
     },
     "pt": {
@@ -166,6 +192,8 @@ PUBLISH = {
                               "e comente sua data de nascimento para uma leitura pessoal grátis. 🔮",
         "hashtags": ["#bazi", "#astrologiachinesa", "#quatropilares", "#zodiaco",
                      "#astrologia", "#fyp", "#espiritualidade", "#mapaastral"],
+        "title_compat": "Nasceram em {da} e {db}? A compatibilidade de vocês, explicada ❤️🔮",
+        "description_compat": "Leitura de compatibilidade BaZi para {da} e {db}. Pontuação: {score}/100. Envie para a sua pessoa! Comentem as duas datas de nascimento para uma leitura grátis. 🔮",
         "cta_comment": "Comente sua data de nascimento para uma leitura grátis!",
     },
 }
