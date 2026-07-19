@@ -51,6 +51,52 @@ voice_dict = {
     "云哲（台湾）-男": "zh-TW-YunJheNeural"
 }
 
+# 出海西班牙语语音（拉美市场）
+es_voice_dict = {
+    "Dalia（墨西哥）-女": "es-MX-DaliaNeural",
+    "Jorge（墨西哥）-男": "es-MX-JorgeNeural",
+    "Elvira（西班牙）-女": "es-ES-ElviraNeural",
+    "Alvaro（西班牙）-男": "es-ES-AlvaroNeural",
+    "Paloma（美国西语）-女": "es-US-PalomaNeural",
+    "Alonso（美国西语）-男": "es-US-AlonsoNeural",
+}
+
+# 出海葡萄牙语语音（巴西市场）
+pt_voice_dict = {
+    "Francisca（巴西）-女": "pt-BR-FranciscaNeural",
+    "Thalita（巴西）-女": "pt-BR-ThalitaMultilingualNeural",
+    "Antonio（巴西）-男": "pt-BR-AntonioNeural",
+    "Raquel（葡萄牙）-女": "pt-PT-RaquelNeural",
+    "Duarte（葡萄牙）-男": "pt-PT-DuarteNeural",
+}
+
+# 出海英文语音（Edge-TTS），适用于 TikTok / YouTube Shorts / Reels 口播
+en_voice_dict = {
+    "Ava（美国）-女": "en-US-AvaMultilingualNeural",
+    "Emma（美国）-女": "en-US-EmmaMultilingualNeural",
+    "Jenny（美国）-女": "en-US-JennyNeural",
+    "Aria（美国）-女": "en-US-AriaNeural",
+    "Michelle（美国）-女": "en-US-MichelleNeural",
+    "Andrew（美国）-男": "en-US-AndrewMultilingualNeural",
+    "Brian（美国）-男": "en-US-BrianMultilingualNeural",
+    "Guy（美国）-男": "en-US-GuyNeural",
+    "Christopher（美国）-男": "en-US-ChristopherNeural",
+    "Sonia（英国）-女": "en-GB-SoniaNeural",
+    "Libby（英国）-女": "en-GB-LibbyNeural",
+    "Ryan（英国）-男": "en-GB-RyanNeural",
+    "Natasha（澳洲）-女": "en-AU-NatashaNeural",
+    "William（澳洲）-男": "en-AU-WilliamNeural",
+    "Clara（加拿大）-女": "en-CA-ClaraNeural",
+    "Neerja（印度）-女": "en-IN-NeerjaNeural",
+}
+
+# 语言代码 -> 语音表（供出海八字模式按 --lang 选择）
+lang_voice_dicts = {
+    "en": en_voice_dict,
+    "es": es_voice_dict,
+    "pt": pt_voice_dict,
+}
+
 voice_text = {
     "晓通（吴语）-女": "好久没有拍视频了，今天拍个视频",
     "云哲（吴语）-男": "先生们，女士们。大家好，阿拉现在来学习上海话",
@@ -165,8 +211,9 @@ async def _generate_audio_and_subtitles(
         kwargs['pitch'] = pitch
     
     communicate = edge_tts.Communicate(text, voice, **kwargs)
-    
+
     submaker = edge_tts.SubMaker()
+    words = []  # 词级时间戳，用于逐词高亮（卡拉OK式）字幕
     # 生成音频
     with open(file_path, "wb") as file:
         async for chunk in communicate.stream():
@@ -174,12 +221,30 @@ async def _generate_audio_and_subtitles(
                 file.write(chunk["data"])
             elif generate_subtitles and chunk["type"] in ["SentenceBoundary", "WordBoundary"]:
                 submaker.feed(chunk)
-    
+                if chunk["type"] == "WordBoundary":
+                    # offset/duration 单位为 100 纳秒
+                    start_ms = chunk["offset"] / 10000
+                    words.append({
+                        "text": chunk["text"],
+                        "start": round(start_ms),
+                        "end": round(start_ms + chunk["duration"] / 10000),
+                    })
+
+    if not generate_subtitles:
+        return None
+
     # 生成字幕文件
     subtitle_path = file_path.with_suffix('.srt')
     with open(subtitle_path, "w", encoding="utf-8") as file:
         file.write(submaker.get_srt())
-    
+
+    # 生成词级时间戳文件
+    if words:
+        import json
+        words_path = file_path.with_suffix('.words.json')
+        with open(words_path, "w", encoding="utf-8") as file:
+            json.dump(words, file, ensure_ascii=False)
+
     return subtitle_path
 
 def createAudio(
