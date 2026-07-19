@@ -17,4 +17,4 @@ jobs:
         # 测试只覆盖 bazi 排盘/文案/发布模块，不需要 pygame/opencv/edge-tts
         run: pip install pytest requests aiohttp
       - name: Run tests
-        run: pytest tests/ -v
+        run: python -m pytest tests/ -v
