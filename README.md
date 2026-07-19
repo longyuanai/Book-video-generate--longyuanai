@@ -43,6 +43,12 @@ python main_bazi.py --compat 1995-08-17,14:30 1997-02-11
 # 生肖系列：一次生成 12 生肖当日运势（日更内容，--jobs 并行提速）
 python main_bazi.py --series zodiac --lang en --jobs 4
 
+# 流年系列：12 生肖年度运势（如 2026 丙午火马年，年度爆款选题）
+python main_bazi.py --series year --year 2026 --lang en --jobs 4
+
+# PDF 命书：付费交付物（四柱/日主/五行/藏干/神煞/大运，一页 A4 深色设计）
+python main_bazi.py --date 1995-08-17 --gender female --report
+
 # 真太阳时校正（出生地经度，传统排盘严谨做法）
 python main_bazi.py --date 1995-08-17 --longitude -74.0 --tz -5
 

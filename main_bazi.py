@@ -74,8 +74,12 @@ def parse_args():
     parser.add_argument("--compat", nargs=2, metavar="DATE[,HH:MM]",
                         help="合婚模式：两人出生日期（可带时间），如 1995-08-17,14:30 1997-02-11")
     parser.add_argument("--batch", help="批量模式：CSV 文件路径（见文件头注释的格式）")
-    parser.add_argument("--series", choices=["zodiac"], help="系列模式：zodiac=12 生肖每日运势")
-    parser.add_argument("--series-date", help="系列模式的日期 YYYY-MM-DD（默认今天）")
+    parser.add_argument("--series", choices=["zodiac", "year"],
+                        help="系列模式：zodiac=12 生肖每日运势，year=12 生肖流年运势")
+    parser.add_argument("--series-date", help="zodiac 系列的日期 YYYY-MM-DD（默认今天）")
+    parser.add_argument("--year", type=int, help="year 系列的目标年份（默认今年）")
+    parser.add_argument("--report", action="store_true",
+                        help="个人命盘模式额外生成 PDF 命书报告（report.pdf，付费交付物）")
     parser.add_argument("--jobs", type=int, default=1,
                         help="批量/系列模式的并行进程数（默认 1；TTS 并发过高可能被限流，建议 ≤4）")
     return parser.parse_args()
@@ -116,7 +120,7 @@ def _tts_and_render(script: str, out_dir: Path, lang: str, voice_keyword, render
 
 def run_chart(date_str: str, time_str: str, tz: float, gender, lang: str,
               voice_keyword, offline: bool, zoom: int, script_only: bool,
-              longitude=None, variants: int = 1) -> Path:
+              longitude=None, variants: int = 1, report: bool = False) -> Path:
     """单条个人命盘流水线，返回输出目录"""
     check_lang(lang)
     birth = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
@@ -149,6 +153,11 @@ def run_chart(date_str: str, time_str: str, tz: float, gender, lang: str,
 
     save_publish_kit(build_chart_publish_kit(chart, lang), out_dir)
     print(f"文案与发布素材已保存到: {out_dir}")
+
+    if report:
+        from bazi.report import generate_report
+        pdf_path = generate_report(chart, out_dir / "report.pdf", FONT_PATH, lang)
+        print(f"PDF 命书已生成: {pdf_path}")
 
     if not script_only:
         from bazi_video import make_bazi_movie
@@ -213,6 +222,25 @@ def _zodiac_job(params: dict) -> str:
             script, out_dir, lang, params["voice"],
             lambda d: make_zodiac_movie(animal, day, lang, RESOURCE_DIR, d,
                                         FONT_PATH, zoom=params["zoom"]))
+    return animal
+
+
+def _year_job(params: dict) -> str:
+    from bazi.annual import build_year_publish_kit, generate_year_script
+    animal, year = params["animal"], params["year"]
+    lang = params["lang"]
+    out_dir = Path(params["out_dir"])
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    script = generate_year_script(animal, year, lang=lang, use_llm=not params["offline"])
+    (out_dir / "script.txt").write_text(script, encoding="utf-8")
+    save_publish_kit(build_year_publish_kit(animal, year, lang), out_dir)
+    if not params["script_only"]:
+        from bazi_video import make_year_movie
+        _tts_and_render(
+            script, out_dir, lang, params["voice"],
+            lambda d: make_year_movie(animal, year, lang, RESOURCE_DIR, d,
+                                      FONT_PATH, zoom=params["zoom"]))
     return animal
 
 
@@ -298,12 +326,25 @@ def main():
         run_zodiac_series(day, args.lang, args)
         return
 
+    if args.series == "year":
+        year = args.year or date_type.today().year
+        series_dir = ROOT_DIR / "appdata" / f"year_{year}_{args.lang}"
+        print(f"生肖流年运势系列：{year} / {args.lang}，输出到 {series_dir}")
+        job_list = [dict(
+            animal=animal, year=year, lang=args.lang,
+            offline=args.offline, script_only=args.script_only,
+            voice=args.voice, zoom=args.zoom,
+            out_dir=str(series_dir / animal.lower()),
+        ) for animal in BRANCH_ANIMAL]
+        _run_jobs(_year_job, job_list, args.jobs, "系列")
+        return
+
     date_str = args.date or input("请输入出生日期 (YYYY-MM-DD): ").strip()
     time_str = args.time if args.date else (
         input("请输入出生时间 (HH:MM，直接回车默认 12:00): ").strip() or "12:00")
     run_chart(date_str, time_str, args.tz, args.gender, args.lang,
               args.voice, args.offline, args.zoom, args.script_only,
-              longitude=args.longitude, variants=args.variants)
+              longitude=args.longitude, variants=args.variants, report=args.report)
 
 
 if __name__ == "__main__":

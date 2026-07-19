@@ -188,5 +188,7 @@ cython_debug/
 appdata/bazi_*/
 appdata/zodiac_*/
 appdata/compat_*/
+appdata/year_*/
+appdata/*.pdf
 designer.md
 CLAUDE.md

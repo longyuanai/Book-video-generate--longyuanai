@@ -15,6 +15,6 @@ jobs:
           python-version: "3.11"
       - name: Install test dependencies
         # 测试只覆盖 bazi 排盘/文案/发布模块，不需要 pygame/opencv/edge-tts
-        run: pip install pytest requests aiohttp
+        run: pip install pytest requests aiohttp fpdf2
       - name: Run tests
         run: python -m pytest tests/ -v

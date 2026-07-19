@@ -5,3 +5,5 @@ numpy>=1.24
 edge-tts>=6.1.10
 requests>=2.31.0
 aiohttp>=3.8.6
+fpdf2>=2.7
+

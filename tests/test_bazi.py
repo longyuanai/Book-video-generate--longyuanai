@@ -1,6 +1,7 @@
 """bazi 模块单元测试（不依赖 pygame/opencv，CI 可轻量运行）"""
 
 from datetime import date, datetime, timedelta
+from pathlib import Path
 
 import pytest
 
@@ -103,6 +104,33 @@ class TestPublishKit:
                         build_zodiac_publish_kit("Dragon", date(2026, 7, 18), lang),
                         build_compat_publish_kit(r, lang)):
                 assert kit["title"] and kit["description"] and kit["hashtags"]
+
+
+class TestAnnual:
+    def test_2026_fire_horse(self):
+        from bazi.annual import generate_year_script, year_pillar, year_relation
+        assert year_pillar(2026).hanzi == "丙午"
+        assert year_relation(2026, "Horse") == "tai_sui"
+        assert year_relation(2026, "Rat") == "chong"
+        assert year_relation(2026, "Goat") == "liuhe"
+        assert year_relation(2026, "Tiger") == "sanhe"
+        for lang in SUPPORTED_LANGS:
+            assert "2026" in generate_year_script("Horse", 2026, lang, use_llm=False)
+
+    def test_year_publish_kit(self):
+        from bazi.annual import build_year_publish_kit
+        kit = build_year_publish_kit("Dragon", 2026, "en")
+        assert "2026" in kit["title"] and "#2026" in kit["hashtags"]
+
+
+class TestReport:
+    def test_pdf_generation(self, tmp_path):
+        pytest.importorskip("fpdf")
+        from bazi.report import generate_report
+        chart = calculate_bazi(datetime(1995, 8, 17, 14, 30), gender="female")
+        font = Path(__file__).parent.parent / "resource" / "fonts" / "msyh.ttc"
+        out = generate_report(chart, tmp_path / "report.pdf", font, "en")
+        assert out.exists() and out.stat().st_size > 15000
 
 
 class TestLLMClient:

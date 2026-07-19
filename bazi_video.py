@@ -430,12 +430,13 @@ class PillarBoard:
 
 
 class ZodiacBoard:
-    """生肖每日运势展示板：大字地支 + 生肖名 + 日期（系列内容用）"""
+    """生肖运势展示板：大字地支 + 生肖名 + 日期（每日/流年系列通用）"""
 
     HEADINGS = {"en": "DAILY FORTUNE", "es": "HORÓSCOPO DEL DÍA", "pt": "HORÓSCOPO DO DIA"}
 
     def __init__(self, animal: str, day: date_type, lang: str,
-                 font_path: Path, screen_w: int, screen_h: int):
+                 font_path: Path, screen_w: int, screen_h: int,
+                 heading: Optional[str] = None, date_text: Optional[str] = None):
         self.screen_w = screen_w
         self.screen_h = screen_h
         scale = screen_h / 1920
@@ -448,11 +449,13 @@ class ZodiacBoard:
         name_font = pygame.font.Font(str(font_path), max(int(72 * scale), 20))
         small_font = pygame.font.Font(str(font_path), max(int(36 * scale), 12))
 
-        heading = title_font.render(self.HEADINGS.get(lang, self.HEADINGS["en"]), True, GOLD)
+        heading = title_font.render(
+            heading or self.HEADINGS.get(lang, self.HEADINGS["en"]), True, GOLD)
         hanzi = hanzi_font.render(BRANCHES[branch], True, color)
         name = name_font.render(ANIMAL_NAMES[lang][animal].upper(), True, WHITE)
         date_line = small_font.render(
-            format_date(datetime(day.year, day.month, day.day), lang), True, DIM)
+            date_text or format_date(datetime(day.year, day.month, day.day), lang),
+            True, DIM)
         element_line = small_font.render(
             f"{ELEMENT_CN[element]} · {ELEMENT_NAMES[lang][element]}", True, color)
 
@@ -657,4 +660,18 @@ def make_compat_movie(result, lang: str, resource_dir: Path, out_dir: Path,
     """渲染合婚配对视频（result 为 bazi.compatibility.CompatResult）"""
     return _render_movie(
         lambda fp, w, h: CompatBoard(result, lang, fp, w, h),
+        resource_dir, out_dir, font_path, zoom, fps)
+
+
+YEAR_HEADINGS = {"en": "{year} FORECAST", "es": "PRONÓSTICO {year}", "pt": "PREVISÃO {year}"}
+
+
+def make_year_movie(animal: str, year: int, lang: str,
+                    resource_dir: Path, out_dir: Path, font_path: Path,
+                    zoom: int = 150, fps: int = 30) -> Optional[Path]:
+    """渲染生肖流年运势视频"""
+    heading = YEAR_HEADINGS.get(lang, YEAR_HEADINGS["en"]).format(year=year)
+    return _render_movie(
+        lambda fp, w, h: ZodiacBoard(animal, date_type(year, 1, 1), lang, fp, w, h,
+                                     heading=heading, date_text=str(year)),
         resource_dir, out_dir, font_path, zoom, fps)
