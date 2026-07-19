@@ -1,0 +1,73 @@
+# 每日自动生成 12 生肖运势视频，打包为可下载的 Artifact
+#
+# - 每天 UTC 00:30（北京时间 08:30）自动运行
+# - 也可在 GitHub 仓库 Actions 页手动触发（可选语言/系列类型）
+# - 生成结果在运行详情页的 Artifacts 区下载（zip 内含成片/封面/标题简介标签）
+# - 可选：仓库 Settings -> Secrets 配置 LLM_API_URL / LLM_API_KEY / LLM_MODEL，
+#   文案将由 LLM 个性化生成；不配置则自动使用内置模板
+#
+# 注意：定时触发只对默认分支（main）上的 workflow 生效，合并 PR 后自动激活。
+
+name: Daily Videos
+
+on:
+  schedule:
+    - cron: "30 0 * * *"
+  workflow_dispatch:
+    inputs:
+      series:
+        description: "内容类型"
+        type: choice
+        options: [zodiac, year]
+        default: zodiac
+      lang:
+        description: "语言"
+        type: choice
+        options: [en, es, pt]
+        default: en
+      year:
+        description: "流年年份（仅 series=year 时使用）"
+        default: "2026"
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y ffmpeg
+          pip install -r requirements.txt
+      - name: Generate videos
+        env:
+          LLM_API_URL: ${{ secrets.LLM_API_URL }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL }}
+        run: |
+          SERIES="${{ inputs.series || 'zodiac' }}"
+          LANG_OPT="${{ inputs.lang || 'en' }}"
+          if [ "$SERIES" = "year" ]; then
+            python main_bazi.py --series year --year "${{ inputs.year || '2026' }}" \
+              --lang "$LANG_OPT" --jobs 2 --zoom 100
+          else
+            python main_bazi.py --series zodiac --lang "$LANG_OPT" --jobs 2 --zoom 100
+          fi
+      - name: Collect outputs
+        run: |
+          mkdir -p dist
+          find appdata -name final_video.mp4 -o -name thumbnail.png -o -name publish.txt \
+            | while read f; do
+              d="dist/$(basename $(dirname $f))"
+              mkdir -p "$d" && cp "$f" "$d/"
+            done
+          ls -R dist
+      - name: Upload videos
+        uses: actions/upload-artifact@v4
+        with:
+          name: videos-${{ github.run_number }}
+          path: dist/
+          retention-days: 7
