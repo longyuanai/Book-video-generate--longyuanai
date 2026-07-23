@@ -72,10 +72,13 @@ class TestScripts:
         c = calculate_bazi(datetime(2000, 1, 1, 0, 30))
         assert "January 01, 2000" in generate_bazi_script(c, use_llm=False)
 
-    def test_zodiac_deterministic(self):
+    def test_zodiac_daily_engine(self):
+        from bazi.script_writer import generate_zodiac_script
         d = date(2026, 7, 18)
-        assert _template_zodiac("Dragon", d, "en") == _template_zodiac("Dragon", d, "en")
-        assert _template_zodiac("Dragon", d, "en") != _template_zodiac("Rat", d, "en")
+        s1 = generate_zodiac_script("Dragon", d, use_llm=False, lang="en")
+        assert s1 == generate_zodiac_script("Dragon", d, use_llm=False, lang="en")  # 确定性
+        assert s1 != generate_zodiac_script("Rat", d, use_llm=False, lang="en")
+        assert "July 18, 2026" in s1
 
 
 class TestCompatibility:
@@ -104,6 +107,66 @@ class TestPublishKit:
                         build_zodiac_publish_kit("Dragon", date(2026, 7, 18), lang),
                         build_compat_publish_kit(r, lang)):
                 assert kit["title"] and kit["description"] and kit["hashtags"]
+
+
+def _make_chart(pillars_str):
+    """从 '甲寅 丙寅 甲寅 乙亥' 构造命盘（测试用）"""
+    from bazi.calculator import BaziChart, Pillar, STEMS as S, BRANCHES as B
+    ps = [Pillar(S.index(x[0]), B.index(x[1])) for x in pillars_str.split()]
+    c = BaziChart(birth_time=datetime(2000, 1, 1))
+    c.year, c.month, c.day, c.hour = ps
+    return c
+
+
+class TestStrength:
+    def test_obviously_strong(self):
+        from bazi.strength import analyze_strength
+        r = analyze_strength(_make_chart("甲寅 丙寅 甲寅 乙亥"))
+        assert r.verdict == "strong"
+        assert "Wood" not in r.favorable_elements  # 身强不喜比劫
+
+    def test_obviously_weak(self):
+        from bazi.strength import analyze_strength
+        r = analyze_strength(_make_chart("庚申 甲申 甲申 庚午"))
+        assert r.verdict == "weak"
+        assert r.favorable_elements == ["Water", "Wood"]  # 印 + 比劫
+        assert r.useful_god == "Water"
+
+    def test_favorable_sentence_all_langs(self):
+        from bazi.strength import favorable_sentence
+        c = calculate_bazi(datetime(1995, 8, 17, 14, 30))
+        for lang in SUPPORTED_LANGS:
+            assert len(favorable_sentence(c, lang)) > 40
+
+    def test_in_chart_templates(self):
+        c = calculate_bazi(datetime(1995, 8, 17, 14, 30))
+        assert "lucky element" in _TEMPLATES["en"](c)
+
+
+class TestDaily:
+    def test_day_pillar_anchor(self):
+        from bazi.daily import day_pillar_of
+        assert day_pillar_of(date(2000, 1, 1)).hanzi == "戊午"
+
+    def test_relations(self):
+        from bazi.daily import daily_relation
+        d = date(2000, 1, 1)  # 戊午日
+        assert daily_relation("Horse", d) == "same"    # 午值日
+        assert daily_relation("Rat", d) == "chong"     # 子午冲
+        assert daily_relation("Goat", d) == "liuhe"    # 午未合
+        assert daily_relation("Tiger", d) == "sanhe"   # 寅午戌
+
+    def test_script_all_langs(self):
+        from bazi.daily import generate_daily_script
+        for lang in SUPPORTED_LANGS:
+            s = generate_daily_script("Horse", date(2000, 1, 1), lang)
+            assert len(s.split()) > 40
+
+    def test_english_article(self):
+        from bazi.daily import generate_daily_script
+        # 戊午为 Earth 日 -> "an Earth ... day"
+        s = generate_daily_script("Horse", date(2000, 1, 1), "en")
+        assert "an Earth" in s
 
 
 class TestAnnual:

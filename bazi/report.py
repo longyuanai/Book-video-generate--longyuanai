@@ -32,6 +32,7 @@ _L: Dict[str, Dict[str, str]] = {
         "hidden": "Hidden Stems", "stars": "Special Stars",
         "luck": "Luck Pillars (10-Year Cycles)", "age": "Age",
         "missing": "Missing element: {e} — focus: {tip}",
+        "favorable": "Lucky element: {e} — wear {color}, face {direction}",
         "disclaimer": "For entertainment and self-reflection only. Not medical, legal or financial advice.",
         "cols": ["YEAR", "MONTH", "DAY", "HOUR"],
     },
@@ -41,6 +42,7 @@ _L: Dict[str, Dict[str, str]] = {
         "hidden": "Troncos Ocultos", "stars": "Estrellas Especiales",
         "luck": "Pilares de la Suerte (ciclos de 10 años)", "age": "Edad",
         "missing": "Elemento faltante: {e} — enfoque: {tip}",
+        "favorable": "Elemento de la suerte: {e} — usa {color}, mira hacia {direction}",
         "disclaimer": "Solo para entretenimiento y autorreflexión. No es consejo médico, legal ni financiero.",
         "cols": ["AÑO", "MES", "DÍA", "HORA"],
     },
@@ -50,6 +52,7 @@ _L: Dict[str, Dict[str, str]] = {
         "hidden": "Troncos Ocultos", "stars": "Estrelas Especiais",
         "luck": "Pilares da Sorte (ciclos de 10 anos)", "age": "Idade",
         "missing": "Elemento faltante: {e} — foco: {tip}",
+        "favorable": "Elemento da sorte: {e} — use {color}, olhe para {direction}",
         "disclaimer": "Apenas para entretenimento e autorreflexão. Não é aconselhamento médico, jurídico ou financeiro.",
         "cols": ["ANO", "MÊS", "DIA", "HORA"],
     },
@@ -137,6 +140,13 @@ def generate_report(chart: BaziChart, out_path: Path, font_path: Path,
         text(16, bar_y + 3, L["missing"].format(
             e=ELEMENT_NAMES[lang][m], tip=ELEMENT_TIPS[lang][m][1]), size=9, color=GOLD)
         bar_y += 6
+    from .strength import ELEMENT_LUCKY, analyze_strength
+    s = analyze_strength(chart)
+    color_name, direction = ELEMENT_LUCKY[s.useful_god][lang]
+    text(16, bar_y + 3, L["favorable"].format(
+        e=ELEMENT_NAMES[lang][s.useful_god], color=color_name, direction=direction),
+        size=9, color=GOLD)
+    bar_y += 6
 
     # ---- 藏干 + 神煞 ----
     y0 = bar_y + 8

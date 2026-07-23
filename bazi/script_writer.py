@@ -86,6 +86,8 @@ def _template_en(chart: BaziChart) -> str:
     stars = chart.shensha()
     if stars:
         parts.append(SHENSHA_PHRASES["en"][stars[0][1]])
+    from .strength import favorable_sentence
+    parts.append(favorable_sentence(chart, "en"))
     parts.append(f"You were also born in the year of the {chart.zodiac_animal}, which adds "
                  f"another layer to your story.")
     parts.append("If this sounds like you, follow for more, and drop your birth date in the "
@@ -124,6 +126,8 @@ def _template_es(chart: BaziChart) -> str:
     stars = chart.shensha()
     if stars:
         parts.append(SHENSHA_PHRASES["es"][stars[0][1]])
+    from .strength import favorable_sentence
+    parts.append(favorable_sentence(chart, "es"))
     parts.append(f"También naciste en el año del {animal}, que añade otra capa a tu historia.")
     parts.append("Si esto suena como tú, sígueme para más, y deja tu fecha de nacimiento "
                  "en los comentarios para una lectura gratis.")
@@ -161,6 +165,8 @@ def _template_pt(chart: BaziChart) -> str:
     stars = chart.shensha()
     if stars:
         parts.append(SHENSHA_PHRASES["pt"][stars[0][1]])
+    from .strength import favorable_sentence
+    parts.append(favorable_sentence(chart, "pt"))
     parts.append(f"Você também nasceu no ano do {animal}, o que adiciona mais uma camada "
                  f"à sua história.")
     parts.append("Se isso soa como você, siga para ver mais, e deixe sua data de nascimento "
@@ -306,6 +312,11 @@ def generate_bazi_script(chart: BaziChart, use_llm: bool = True, lang: str = "en
             "hidden_stems": chart.hidden_stems(),
             "special_stars": [f"{en} ({meaning})" for _, en, meaning in chart.shensha()],
         }
+        from .strength import analyze_strength
+        s = analyze_strength(chart)
+        chart_data["day_master_strength"] = f"{s.verdict} (support ratio {s.ratio:.0%})"
+        chart_data["favorable_elements"] = s.favorable_elements
+        chart_data["lucky_element"] = s.useful_god
         if chart.luck_pillars:
             chart_data["luck_pillars"] = [
                 f"age {lp.age_range()}: {lp.pillar.hanzi} ({lp.pillar.english()})"
@@ -325,18 +336,23 @@ def generate_zodiac_script(animal: str, day: date_type, use_llm: bool = True,
     check_lang(lang)
     if animal not in BRANCH_ANIMAL:
         raise ValueError(f"未知生肖 '{animal}'，可选: {', '.join(BRANCH_ANIMAL)}")
+    from .daily import daily_fortune, generate_daily_script
     if use_llm:
         branch = zodiac_branch_index(animal)
+        f = daily_fortune(animal, day)
         message = str({
             "content_type": "zodiac daily fortune (entertainment)",
             "zodiac_animal": animal,
             "branch_element": BRANCH_ELEMENT[branch],
             "date": str(day),
+            "day_pillar": f"{f['day_pillar'].hanzi} ({f['day_element']} {f['day_pillar'].animal} day)",
+            "relation_to_day": f["relation"],
+            "lucky_number": f["lucky_number"],
         })
         content = _try_llm(message, lang)
         if content:
             return content
-    return _template_zodiac(animal, day, lang)
+    return generate_daily_script(animal, day, lang)
 
 
 if __name__ == "__main__":
