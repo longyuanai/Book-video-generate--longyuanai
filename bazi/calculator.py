@@ -290,6 +290,11 @@ class BaziChart:
         stars = self.shensha()
         if stars:
             lines.append(f"  Stars 神煞: {'  '.join(f'{cn}({en})' for cn, en, _ in stars)}")
+        from .strength import analyze_strength
+        s = analyze_strength(self)
+        lines.append(f"  Strength 旺衰: {s.verdict_cn} ({s.ratio:.0%})  "
+                     f"用神: {ELEMENT_CN[s.useful_god]} {s.useful_god}  "
+                     f"喜: {'/'.join(s.favorable_elements)}")
         lines.append("=" * 56)
         return "\n".join(lines)
 
